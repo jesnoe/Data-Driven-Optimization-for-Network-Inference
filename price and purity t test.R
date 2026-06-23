@@ -29,6 +29,8 @@ library(lubridate)
     if (state_i == "Virginia") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
   }
   neighbor$`District of Columbia` <- c("Maryland", "Virginia")
+  neighbor$Michigan <- neighbor$Michigan[-3] # remove Minnesota from Michigan's neighbors
+  neighbor$Minnesota <- neighbor$Minnesota[-2] # remove Michigan from Minnesota's neighbors
   
   # Cocaine Data
   cocaine <- stride %>%
@@ -73,6 +75,18 @@ library(lubridate)
   years1 <- 2000:2003
   years2 <- 2004:2008
   years3 <- 2009:2014
+  
+  period <- years3
+  price_period <- cocaine %>%
+    filter(!is.na(state) & Seize.Year %in% period & adjusted_price > 0 & Nt.Wt >= 5 & Nt.Wt <= 1000) %>%
+    group_by(state) %>% 
+    summarise(avg_price=mean(adjusted_price, na.rm=T),
+              med_price=median(adjusted_price, na.rm=T))
+  
+  cocaine_period <- cocaine %>% 
+    filter(!is.na(state) & Seize.Year %in% c(years2, years3) & adjusted_price > 0 & Nt.Wt >= 5 & Nt.Wt <= 1000)
+  # cocaine_period %>% group_by(state) %>% summarize(n_pu=n()) %>% view
+  cocaine_period %>% filter(state %in% c("Vermont", "South Dakota", "Oregon"))
 }
 
 find_state_index <- function(d_var) {
@@ -88,30 +102,25 @@ find_state_index <- function(d_var) {
 }
 find_state_index <- Vectorize(find_state_index)
 
-cocaine_purities <- cocaine %>% 
-  filter(!is.na(state) & Seize.Year %in% c(years2, years3) & adjusted_price > 0 & Nt.Wt >= 5 & Nt.Wt <= 1000)
-cocaine_purities %>% group_by(state) %>% summarize(n_pu=n()) %>% view
-cocaine_purities %>% filter(state %in% c("Vermont", "South Dakota", "Oregon"))
-
-purity_t_test_summary <- tibble()
+t_test_summary <- tibble()
 for (i in 1:49) {
   state_i <- states_data$state[i]
   bordering_states <- neighbor[[state_i]]
-  
-  state_purities <- cocaine_purities %>% 
-    filter(state == state_i) %>% 
-    pull(Potency)
-  
-  if (length(state_purities) < 3) next
-  
+
+  state_prices <- cocaine_period %>%
+    filter(state == state_i) %>%
+    pull(adjusted_price)
+
+  if (length(state_prices) < 3) next
+
   for(bordering_state in bordering_states) {
-    bordering_state_purities <- cocaine_purities %>% 
-      filter(state == bordering_state) %>% 
-      pull(Potency)
-    
-    if (length(bordering_state_purities) < 3) next
-    price_t_test <- t.test(state_purities, bordering_state_purities)
-    purity_t_test_summary <- rbind(purity_t_test_summary,
+    bordering_state_prices <- cocaine_period %>%
+      filter(state == bordering_state) %>%
+      pull(adjusted_price)
+
+    if (length(bordering_state_prices) < 3) next
+    price_t_test <- t.test(state_prices, bordering_state_prices, alternative = "less")
+    t_test_summary <- rbind(t_test_summary,
                             tibble(state_index=i,
                                    bordering_state_index=states_data$states_index[which(states_data$state == bordering_state)],
                                    state=state_i,
@@ -121,7 +130,38 @@ for (i in 1:49) {
                                    p_value=price_t_test$p.value))
   }
 }
-purity_t_test_summary <- purity_t_test_summary %>% filter(state_index < bordering_state_index)
-# write.csv(purity_t_test_summary, paste0("Cocaine Network Optimization/purity t_test_summary (", period[1], "-", period[length(period)], ").csv"), row.names=F)
+t_test_summary
+write.csv(t_test_summary, paste0("Cocaine Network Optimization/price t_test_summary less (", period[1], "-", period[length(period)], ").csv"), row.names=F)
+t_test_summary %>% filter(p_value > 0.5)
+
+purity_t_test_summary <- tibble()
+for (i in 1:49) {
+  state_i <- states_data$state[i]
+  bordering_states <- neighbor[[state_i]]
+  
+  state_purities <- cocaine_period %>% 
+    filter(state == state_i) %>% 
+    pull(Potency)
+  
+  if (length(state_purities) < 3) next
+  
+  for(bordering_state in bordering_states) {
+    bordering_state_purities <- cocaine_period %>% 
+      filter(state == bordering_state) %>% 
+      pull(Potency)
+    
+    if (length(bordering_state_purities) < 3) next
+    purity_t_test <- t.test(state_purities, bordering_state_purities, alternative = "greater")
+    purity_t_test_summary <- rbind(purity_t_test_summary,
+                            tibble(state_index=i,
+                                   bordering_state_index=states_data$states_index[which(states_data$state == bordering_state)],
+                                   state=state_i,
+                                   bordering_state=bordering_state,
+                                   mean_state=purity_t_test$estimate[1],
+                                   mean_bordering_state=purity_t_test$estimate[2],
+                                   p_value=purity_t_test$p.value))
+  }
+}
+write.csv(purity_t_test_summary, paste0("Cocaine Network Optimization/purity t_test_summary greater (", period[1], "-", period[length(period)], ").csv"), row.names=F)
 
 purity_t_test_summary %>% select(state_index, bordering_state_index) %>% unique

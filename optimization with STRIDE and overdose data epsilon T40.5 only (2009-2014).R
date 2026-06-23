@@ -1,5 +1,5 @@
 # setwd("/Users/R")
-# setwd("C:/Users/Users/Documents/R")
+# setwd("C:/Users/User/Documents/R")
 library(readxl)
 library(gurobi)
 library(stringi)
@@ -7,6 +7,7 @@ library(urbnmapr)
 library(tidyverse)
 library(gridExtra)
 library(lubridate)
+library(sf)
 
 {
 stride <- read.csv("Cocaine Network Optimization/STRIDE_Raw.csv") %>% as_tibble %>% filter(!is.na(Seize.Year) & !is.na(Seize.Month) & !(State %in% c("AK", "HI")))
@@ -309,7 +310,7 @@ opt_val_i <- 18.96
 epsilon_s_results <- data.frame()
 for (epsilon_s in seq(0, 1, by=0.02)) {
   model_epsilon_s <- list()
-  model_epsilon_s$obj        <- c(rep(1-alpha, n_d_vars - n_zero_d_vars - 2*N), rep(0, N), rep(alpha, N))
+  model_epsilon_s$obj        <- c(rep(1-alpha_i, n_d_vars - n_zero_d_vars - 2*N), rep(0, N), rep(alpha_i, N))
   model_epsilon_s$modelsense <- "min"
   model_epsilon_s$A          <- rbind(A1[,-zero_d_vars_index], A2[,-zero_d_vars_index], A3[,-zero_d_vars_index], A_source_limit[,-zero_d_vars_index])
   model_epsilon_s$sense      <- rep(">", nrow(model_epsilon_s$A))
@@ -367,9 +368,9 @@ for (alpha_i in seq(1, 0, by=-.1)) {
     opt_sol <- cbind(opt_sol, find_state_index(opt_sol$decision_vars) %>% t) %>% 
       rename(i="1", j="2")
     
-    states <- get_urbn_map(map = "states", sf = TRUE)
-    overdose_map_year <- left_join(states %>%
-                                     rename(state=state_name) %>% 
+    states_sf <- get_urbn_map(map = "states", sf = TRUE)
+    overdose_map_year <- left_join(states_sf %>%
+                                     rename(state=state_name) %>%
                                      filter(!(state %in% c("Alaska", "Hawaii"))) %>% 
                                      mutate(centroid = st_centroid(geometry)),
                                    states_data %>% select(state, med_death, states_index),

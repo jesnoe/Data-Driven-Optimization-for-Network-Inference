@@ -218,7 +218,7 @@ alpha_t_test <- 0.25
   b2_log_ratio <- 100*log_seizure/sum(log_seizure)
   
   # Directionality of flow
-  relaxed_pairs_index <- tibble()
+  relaxed_pairs_index <- t_test_summary %>% filter(p_value > alpha_t_test) %>% select(state_index, bordering_state_index)
   less_than_price <- c()
   for (i in 1:(n_d_vars-2*N)) {
     var <- d_vars[i]
@@ -231,15 +231,8 @@ alpha_t_test <- 0.25
       next
     }
     
-    
-    if (source_index %in% t_test_summary$state_index & destination_index %in% t_test_summary$bordering_state_index) {
-      if (t_test_summary %>%
-          filter(state_index==source_index & bordering_state_index == destination_index) %>%
-          pull(p_value) > alpha_t_test) {
-        relaxed_pairs_index <- rbind(relaxed_pairs_index, c(source_index, destination_index))
-        next
-      } 
-    }
+    t_test_pair <- relaxed_pairs_index %>% filter((state_index==source_index & bordering_state_index == destination_index | (state_index==destination_index & bordering_state_index == source_index)))
+    if (nrow(t_test_pair) > 0) next
     
     if (price[destination_index] < price[source_index]) less_than_price <- c(less_than_price, i)
   }
@@ -263,7 +256,7 @@ alpha_t_test <- 0.25
 
 
 alpha_i <- 0.9
-epsilon_si <- 1
+epsilon_si <- 0.44
 opt_val_i <- 34.15
 n_relaxed_pairs <- nrow(relaxed_pairs_index)
 for (alpha_i in seq(1, 0, by=-0.1)) {
@@ -277,7 +270,7 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
     model_epsilon_s$sense[nrow(model_epsilon_s$A)] <- "="
     model_epsilon_s$vtype      <- c(rep("C", length(model_epsilon_s$obj) - N), rep("B", N)) # Continuous and binary
     model_epsilon_s$rhs        <- c(b1, epsilon_si*b2_ratio, b3, b_source_limit)
-    model_epsilon_s$sos <- vector(mode="list", length=n_relaxed_pairs+3)
+    model_epsilon_s$sos <- vector(mode="list", length=n_relaxed_pairs+2)
     for (j in 1:n_relaxed_pairs) {
       model_epsilon_s$sos[[j]]$type <- 1
       model_epsilon_s$sos[[j]]$index <- which(d_vars[-zero_d_vars_index] %in% c(paste0("w",
@@ -295,14 +288,11 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
       model_epsilon_s$sos[[j]]$weight <- 1:2
     }
     model_epsilon_s$sos[[n_relaxed_pairs+1]]$type <- 2
-    model_epsilon_s$sos[[n_relaxed_pairs+1]]$index <- which(d_vars[-zero_d_vars_index] %in% c("w4,36.", "w36,27.", "w27,4."))
+    model_epsilon_s$sos[[n_relaxed_pairs+1]]$index <- which(d_vars[-zero_d_vars_index] %in% c("w4,27.", "w27,36.", "w36,4."))
     model_epsilon_s$sos[[n_relaxed_pairs+1]]$weight <- 1:3
     model_epsilon_s$sos[[n_relaxed_pairs+2]]$type <- 2
-    model_epsilon_s$sos[[n_relaxed_pairs+2]]$index <- which(d_vars[-zero_d_vars_index] %in% c("w4,27.", "w27,36.", "w36,4."))
+    model_epsilon_s$sos[[n_relaxed_pairs+2]]$index <- which(d_vars[-zero_d_vars_index] %in% c("w9,1.", "w1,10.", "w10,9."))
     model_epsilon_s$sos[[n_relaxed_pairs+2]]$weight <- 1:3
-    model_epsilon_s$sos[[n_relaxed_pairs+3]]$type <- 2
-    model_epsilon_s$sos[[n_relaxed_pairs+3]]$index <- which(d_vars[-zero_d_vars_index] %in% c("w9,1.", "w1,10.", "w10,9."))
-    model_epsilon_s$sos[[n_relaxed_pairs+3]]$weight <- 1:3
     result_epsilon_s_sum       <- gurobi(model_epsilon_s, list(Method=-1))
     
     opt_val_i <- round(result_epsilon_s_sum$objval, 2)
@@ -331,9 +321,9 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
     opt_sol <- cbind(opt_sol, find_state_index(opt_sol$decision_vars) %>% t) %>% 
       rename(i="1", j="2")
     
-    states <- get_urbn_map(map = "states", sf = TRUE)
-    overdose_map_year <- left_join(states %>%
-                                     rename(state=state_name) %>% 
+    states_sf <- get_urbn_map(map = "states", sf = TRUE)
+    overdose_map_year <- left_join(states_sf %>%
+                                     rename(state=state_name) %>%
                                      filter(!(state %in% c("Alaska", "Hawaii"))) %>% 
                                      mutate(centroid = st_centroid(geometry)),
                                    states_data %>% select(state, med_death, states_index),
