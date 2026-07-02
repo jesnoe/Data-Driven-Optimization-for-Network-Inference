@@ -256,7 +256,7 @@ alpha_t_test <- 0.25
 
 
 alpha_i <- 0.9
-epsilon_si <- 0.44
+epsilon_si <- 0.4
 opt_val_i <- 34.15
 n_relaxed_pairs <- nrow(relaxed_pairs_index)
 for (alpha_i in seq(1, 0, by=-0.1)) {
@@ -303,7 +303,7 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
     result_source_index <- grep("S", opt_sol$decision_vars)
     max_flow <- max(opt_sol$optimal_sols[result_flow_index])
     
-    opt_sol %>% write.csv(paste0("Cocaine Network Optimization/Results/Equal mean test/optimal solution equal mean test epsilton_s ",
+    opt_sol %>% write.csv(paste0("Cocaine Network Optimization/Results with Overdose deaths T40.5 only equal mean test 1999-2016/optimal solution equal mean test epsilton_s ",
                                  period[1], "-", period[length(period)],
                                  " (alpha=",
                                  alpha_i,
@@ -341,7 +341,7 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
     
     
     overdose_map_year %>% ggplot() +
-      geom_sf(aes(fill = med_death),
+      geom_sf(fill = "white",
                   color="black") +
       # geom_polygon(aes(x=long,
       #                  y=lat,
@@ -365,14 +365,14 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
                        y=lat_i, 
                        xend=long_j,
                        yend=lat_j),
-                   color="grey60",
+                   color="black",
                    linewidth = 0.2+2*opt_sol$optimal_sols[result_flow_index]/max_flow,
                    arrow=arrow(angle=10,
                                length=unit(0.3, "cm"),
                                type="closed")
       ) +
       geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "red", size =3) -> optimal_network_map
-    ggsave(paste0("Cocaine Network Optimization/Results/Equal mean test/optimal networks equal mean test epsilton_s ",
+    ggsave(paste0("Cocaine Network Optimization/Results with Overdose deaths T40.5 only equal mean test 1999-2016/optimal networks equal mean test epsilton_s ",
                   period[1], "-", period[length(period)],
                   " (alpha=",
                   alpha_i,

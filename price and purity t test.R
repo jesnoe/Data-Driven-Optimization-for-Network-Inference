@@ -119,7 +119,7 @@ for (i in 1:49) {
       pull(adjusted_price)
 
     if (length(bordering_state_prices) < 3) next
-    price_t_test <- t.test(state_prices, bordering_state_prices, alternative = "less")
+    price_t_test <- t.test(state_prices, bordering_state_prices, alternative = "greater")
     t_test_summary <- rbind(t_test_summary,
                             tibble(state_index=i,
                                    bordering_state_index=states_data$states_index[which(states_data$state == bordering_state)],
@@ -131,7 +131,7 @@ for (i in 1:49) {
   }
 }
 t_test_summary
-write.csv(t_test_summary, paste0("Cocaine Network Optimization/price t_test_summary less (", period[1], "-", period[length(period)], ").csv"), row.names=F)
+write.csv(t_test_summary, paste0("Cocaine Network Optimization/price t_test_summary greater (", period[1], "-", period[length(period)], ").csv"), row.names=F)
 t_test_summary %>% filter(p_value > 0.5)
 
 purity_t_test_summary <- tibble()
@@ -151,7 +151,7 @@ for (i in 1:49) {
       pull(Potency)
     
     if (length(bordering_state_purities) < 3) next
-    purity_t_test <- t.test(state_purities, bordering_state_purities, alternative = "greater")
+    purity_t_test <- t.test(state_purities, bordering_state_purities, alternative = "less")
     purity_t_test_summary <- rbind(purity_t_test_summary,
                             tibble(state_index=i,
                                    bordering_state_index=states_data$states_index[which(states_data$state == bordering_state)],
@@ -162,6 +162,6 @@ for (i in 1:49) {
                                    p_value=purity_t_test$p.value))
   }
 }
-write.csv(purity_t_test_summary, paste0("Cocaine Network Optimization/purity t_test_summary greater (", period[1], "-", period[length(period)], ").csv"), row.names=F)
+write.csv(purity_t_test_summary, paste0("Cocaine Network Optimization/purity t_test_summary less (", period[1], "-", period[length(period)], ").csv"), row.names=F)
 
 purity_t_test_summary %>% select(state_index, bordering_state_index) %>% unique

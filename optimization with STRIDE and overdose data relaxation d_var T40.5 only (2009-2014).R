@@ -11,73 +11,73 @@ library(Matrix)
 library(sf)
 
 {
-stride <- read.csv("Cocaine Network Optimization/STRIDE_Raw.csv") %>% as_tibble %>% filter(!is.na(Seize.Year) & !is.na(Seize.Month) & !(State %in% c("AK", "HI")))
-stride$Nt.Wt <- as.numeric(stride$Nt.Wt)
-stride$Potency <- as.numeric(stride$Potency)
-stride$Post.Price <- as.numeric(stride$Post.Price)
-# for (i in c(1,2,6,7)) {
-#   stride[,i] <- as.factor(stride[,i]) 
-# }
-stride$State <- ifelse(stride$State == "NB", "NE", stride$State)
-
-neighbor_xlsx <- read_xlsx("Cocaine Network Optimization/states neighborhood.xlsx")
-neighbor <- list()
-for (i in 1:length(neighbor_xlsx$State)) {
-  state_i <- neighbor_xlsx$State[i]
-  neighbor[[state_i]] <- strsplit(neighbor_xlsx$Bordering_States[i], ", ")[[1]]
-  if (state_i == "Maryland") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
-  if (state_i == "Virginia") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
-}
-neighbor$`District of Columbia` <- c("Maryland", "Virginia")
-neighbor$Michigan <- neighbor$Michigan[-3] # remove Minnesota from Michigan's neighbors
-neighbor$Minnesota <- neighbor$Minnesota[-2] # remove Michigan from Minnesota's neighbors
-
-# Cocaine Data
-cocaine <- stride %>%
-  filter(Drug %in% c("COCAINE", "COCAINE HYDROCHLORIDE") & Seize.Year != "NULL" & Seize.Month != "NULL" & State != "NULL") %>% 
-  mutate(state=as.factor(State),
-         MethAcq=as.factor(MethAcq),
-         Drug=as.factor(Drug),
-         Potency=ifelse(Potency > 100, Potency/10, Potency),
-         Potency=ifelse(Potency > 0 & Potency < 1, Potency*100, Potency),
-         Seize.Year=as.numeric(Seize.Year),
-         Seize.Month=as.numeric(Seize.Month),
-         adjusted_price=Post.Price/(Nt.Wt*Potency/100)) %>% 
-  mutate(adjusted_price=ifelse(Potency == 0, NA, adjusted_price)) %>% 
-  filter(Seize.Year > 1999) %>% 
-  left_join(states %>% 
-              rename(state=state_abbv) %>% 
-              select(state, state_name) %>% 
-              unique,
-            by="state") %>% 
-  select(-State, -state) %>% 
-  rename(state=state_name) %>% 
-  relocate(state)
-
-overdose <- read_xlsx("Cocaine Network Optimization/Overdose deaths T40.5 only 1999-2020.xlsx")
-VSRR <- read.csv("Cocaine Network Optimization/VSRR_Provisional_Drug_Overdose_Death_Counts (2015-2023).csv") %>%
-  as_tibble %>% 
-  mutate(state=State,
-         Data.Value=as.numeric(Data.Value)) %>% 
-  left_join(states %>% 
-              rename(state=state_abbv) %>% 
-              select(state, state_name) %>% 
-              unique,
-            by="state") %>% 
-  select(-State, -state) %>% 
-  rename(state=state_name) %>% 
-  relocate(state)
-VSRR_cocaine <- VSRR %>% 
-  filter(Indicator == "Cocaine (T40.5)") %>% 
-  group_by(state, Year) %>% 
-  summarize(overdose_death=sum(Data.Value, na.rm=T))
-
-years1 <- 2000:2003
-years2 <- 2004:2008
-years3 <- 2009:2014
-
-price_t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summary less (2009-2014).csv") %>% as_tibble
-purity_t_test_summary <- read.csv("Cocaine Network Optimization/purity t_test_summary greater (2009-2014).csv") %>% as_tibble
+  stride <- read.csv("Cocaine Network Optimization/STRIDE_Raw.csv") %>% as_tibble %>% filter(!is.na(Seize.Year) & !is.na(Seize.Month) & !(State %in% c("AK", "HI")))
+  stride$Nt.Wt <- as.numeric(stride$Nt.Wt)
+  stride$Potency <- as.numeric(stride$Potency)
+  stride$Post.Price <- as.numeric(stride$Post.Price)
+  # for (i in c(1,2,6,7)) {
+  #   stride[,i] <- as.factor(stride[,i]) 
+  # }
+  stride$State <- ifelse(stride$State == "NB", "NE", stride$State)
+  
+  neighbor_xlsx <- read_xlsx("Cocaine Network Optimization/states neighborhood.xlsx")
+  neighbor <- list()
+  for (i in 1:length(neighbor_xlsx$State)) {
+    state_i <- neighbor_xlsx$State[i]
+    neighbor[[state_i]] <- strsplit(neighbor_xlsx$Bordering_States[i], ", ")[[1]]
+    if (state_i == "Maryland") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
+    if (state_i == "Virginia") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
+  }
+  neighbor$`District of Columbia` <- c("Maryland", "Virginia")
+  neighbor$Michigan <- neighbor$Michigan[-3] # remove Minnesota from Michigan's neighbors
+  neighbor$Minnesota <- neighbor$Minnesota[-2] # remove Michigan from Minnesota's neighbors
+  
+  # Cocaine Data
+  cocaine <- stride %>%
+    filter(Drug %in% c("COCAINE", "COCAINE HYDROCHLORIDE") & Seize.Year != "NULL" & Seize.Month != "NULL" & State != "NULL") %>% 
+    mutate(state=as.factor(State),
+           MethAcq=as.factor(MethAcq),
+           Drug=as.factor(Drug),
+           Potency=ifelse(Potency > 100, Potency/10, Potency),
+           Potency=ifelse(Potency > 0 & Potency < 1, Potency*100, Potency),
+           Seize.Year=as.numeric(Seize.Year),
+           Seize.Month=as.numeric(Seize.Month),
+           adjusted_price=Post.Price/(Nt.Wt*Potency/100)) %>% 
+    mutate(adjusted_price=ifelse(Potency == 0, NA, adjusted_price)) %>% 
+    filter(Seize.Year > 1999) %>% 
+    left_join(states %>% 
+                rename(state=state_abbv) %>% 
+                select(state, state_name) %>% 
+                unique,
+              by="state") %>% 
+    select(-State, -state) %>% 
+    rename(state=state_name) %>% 
+    relocate(state)
+  
+  overdose <- read_xlsx("Cocaine Network Optimization/Overdose deaths T40.5 only 1999-2020.xlsx")
+  VSRR <- read.csv("Cocaine Network Optimization/VSRR_Provisional_Drug_Overdose_Death_Counts (2015-2023).csv") %>%
+    as_tibble %>% 
+    mutate(state=State,
+           Data.Value=as.numeric(Data.Value)) %>% 
+    left_join(states %>% 
+                rename(state=state_abbv) %>% 
+                select(state, state_name) %>% 
+                unique,
+              by="state") %>% 
+    select(-State, -state) %>% 
+    rename(state=state_name) %>% 
+    relocate(state)
+  VSRR_cocaine <- VSRR %>% 
+    filter(Indicator == "Cocaine (T40.5)") %>% 
+    group_by(state, Year) %>% 
+    summarize(overdose_death=sum(Data.Value, na.rm=T))
+  
+  years1 <- 2000:2003
+  years2 <- 2004:2008
+  years3 <- 2009:2014
+  
+  price_t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summary greater (2009-2014).csv") %>% as_tibble
+  purity_t_test_summary <- read.csv("Cocaine Network Optimization/purity t_test_summary less (2009-2014).csv") %>% as_tibble
 }
 
 find_state_index <- function(d_var) {
@@ -272,6 +272,11 @@ states_data %>% filter(state %in% c("California", "Texas", "Florida", "New York"
     cols <- c(cols, d_var_idx_$s)
     vals <- c(vals, rep(1, N))
     
+    # epsilon variables
+    rows <- c(rows, 1:N)
+    cols <- c(cols, d_var_idx_$epsilon)
+    vals <- c(vals, -100 * seizure/sum(seizure))
+    
     result <- sparseMatrix(
       i = rows,
       j = cols,
@@ -281,51 +286,28 @@ states_data %>% filter(state %in% c("California", "Texas", "Florida", "New York"
     
     return(result)
   }
-  b_seizure <- 100*seizure/sum(seizure)
+  b_seizure <- rep(0, N)
+  # b_seizure <- 100 * seizure/sum(seizure)
   
-  A_price_create <- function(d_var_idx_) {
+  A_flow_indicator_create <- function(d_var_idx_) {
     rows <- c(rep(1:E, 2),
-              rep((E+1):(2*E), 2),
-              rep((2*E+1):(3*E), 2))
+              rep((E+1):(2*E), 2))
     cols <- c(d_var_idx_$w, d_var_idx_$x,
-              d_var_idx_$x, d_var_idx_$ep1,
-              d_var_idx_$x, d_var_idx_$ep1)
+              d_var_idx_$w, d_var_idx_$x)
     vals <- c(rep(-1, E), rep(100, E),
-              rep(1.1, E), rep(-1, E),
-              rep(-1.1, E), rep(1, E))
+              rep(1, E), rep(-0.0001, E))
     n_d_vars_ <- d_var_idx_[[length(d_var_idx_)]] %>% max
     
     result <- sparseMatrix(
       i = rows,
       j = cols,
       x = vals,
-      dims = c(3*E, n_d_vars_)
+      dims = c(2*E, n_d_vars_)
     )
     
     return(result)
   }
-  b_price <- c(rep(0, E), -price_pval_vec, price_pval_vec - 1.1)
-  
-  A_price_complement_create <- function(d_var_idx_) {
-    
-    rows <- c(rep(1:K, 2),
-              rep((K+1):(2*K), 2))
-    cols <- c(d_var_idx_$w[undir_edges$edges_idx], d_var_idx_$z,
-              d_var_idx_$w[undir_edges$edges_idx_rev], d_var_idx_$z)
-    vals <- c(rep(-1, K), rep(100, K),
-              rep(-1, K), rep(-100, K))
-    n_d_vars_ <- d_var_idx_[[length(d_var_idx_)]] %>% max
-    
-    result <- sparseMatrix(
-      i = rows,
-      j = cols,
-      x = vals,
-      dims = c(2*K, n_d_vars_)
-    )
-    
-    return(result)
-  }
-  b_price_complement <- c(rep(0, K), rep(-100, K))
+  b_flow_indicator <- rep(0, 2*E)
   
   A_source_limit_create <- function(d_var_idx_) {
     n_d_vars_ <- d_var_idx_[[length(d_var_idx_)]] %>% max
@@ -380,14 +362,14 @@ states_data %>% filter(state %in% c("California", "Texas", "Florida", "New York"
   }
 }
 
-## price d_var without price_complement
-n_E_var <- 3
+## price d_var without w_complement
+n_E_var <- 2
 d_var_idx <- list(
   w = 1:E,
-  ep1 = (E+1):(2*E),
-  x = (2*E+1):(3*E),
-  s = (n_E_var*E+1):(n_E_var*E+N),
-  t = (n_E_var*E+N+1):(n_E_var*E+2*N)
+  x = (E+1):(2*E),
+  epsilon = (n_E_var*E+1):(n_E_var*E+N),
+  s = (n_E_var*E+N+1):(n_E_var*E+2*N),
+  t = (n_E_var*E+2*N+1):(n_E_var*E+3*N)
 )
 
 d_vars <- create_d_vars(d_var_idx)
@@ -396,39 +378,38 @@ n_d_vars <- length(d_vars)
 A_source_limit <- A_source_limit_create(d_var_idx)
 A_consumption <- A_consumption_create(d_var_idx)
 A_seizure <- A_seizure_create(d_var_idx)
-A_price <- A_price_create(d_var_idx)
+A_flow_indicator <- A_flow_indicator_create(d_var_idx)
 A_source_indicator <- A_source_indicator_create(d_var_idx)
 
-A_ <- rbind(A_source_limit, A_consumption, A_seizure, A_price,  A_source_indicator)
-rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_price, b_source_indicator)
+A_ <- rbind(A_source_limit, A_consumption, A_seizure, A_flow_indicator,  A_source_indicator)
+rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_flow_indicator, b_source_indicator)
 sense_ <- c(rep("=", 1+N), rep(">", nrow(A_)-N-1))
 # sense_ <- c("=", rep(">", nrow(A_)-1))
 
 {
-  price_pval_threshold <- 0.2
-  price_pval_vec_allowed <- ifelse(price_pval_vec > 0.2, price_pval_vec, 0)
-  b_price <- c(rep(0, E), -price_pval_vec_allowed, price_pval_vec_allowed - 1.1)
-  rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_price, b_source_indicator)
-  
+  # price_pval_threshold <- 0.8
+  price_violated_idx <- which(price_t_test_summary$mean_state <= price_t_test_summary$mean_bordering_state)
+  price_pval_vec_filtered <- price_pval_vec
+  price_pval_vec_filtered[price_violated_idx] <- 1
   obj_ <- integer(n_d_vars)
-  # obj_[d_var_idx$ep1] <- exp(price_pval_vec)
-  obj_[d_var_idx$ep1] <-  1/(1.01-price_pval_vec)
+  # obj_[d_var_idx$epsilon] <- (1-price_pval_vec)
+  obj_[d_var_idx$x[price_violated_idx]] <-  (1-price_pval_vec)[price_violated_idx]
   
   vtype_ <- rep("C", n_d_vars)
   vtype_[d_var_idx$x] <- "B"
-  vtype_[d_var_idx$z] <- "B"
+  # vtype_[d_var_idx$z] <- "B"
   vtype_[d_var_idx$t] <- "B"
   
   # lb_ <- integer(n_d_vars)
   # ub_ <- rep(Inf, n_d_vars)
-  # ub_[d_var_idx$ep1] <- 1
+  # ub_[d_var_idx$epsilon] <- 1
   # ub_[d_var_idx$x] <- 1
   # ub_[d_var_idx$t] <- 1
 }
 
-price_dvar_model <- solve_gurobi(obj = obj_, A = A_, sense = sense_, vtype = vtype_, rhs = rhs_)
 
 obj_[d_var_idx$w] <- 1
+obj_[d_var_idx$epsilon] <- 1
 obj_[d_var_idx$t] <- 1
 price_dvar_model_b1 <- solve_gurobi(obj = obj_, A = A_, sense = sense_, vtype = vtype_, rhs = rhs_)
 
@@ -444,9 +425,9 @@ price_dvar_model_b1_sol <- tibble(variable = d_vars, opt_val = price_dvar_model_
 price_dvar_model_b5_sol <- tibble(variable = d_vars, opt_val = price_dvar_model_b5$x)
 price_dvar_model_b10_sol <- tibble(variable = d_vars, opt_val = price_dvar_model_b10$x)
 
-price_dvar_model_b1_sol[d_var_idx$ep1,]
-price_dvar_model_b5_sol[d_var_idx$ep1,]
-price_dvar_model_b10_sol[d_var_idx$ep1,]
+price_dvar_model_b1_sol[d_var_idx$epsilon,]
+price_dvar_model_b5_sol[d_var_idx$epsilon,]
+price_dvar_model_b10_sol[d_var_idx$epsilon,]
 
 
 # (price_t_test_summary %>% filter(state %in% c("Alabama", "Florida", "Georgia")) %>% select(state, bordering_state, p_value))[c(1,2,5,6,7,8),]
@@ -455,16 +436,16 @@ price_dvar_model_b10_sol[d_var_idx$ep1,]
 # opt_sol$optimal_sols[lookup[c("w_9,1", "w_9,10")]]
 
 # opt_sol$optimal_sols[d_var_idx$w] %>% sum
-# opt_sol[d_var_idx$ep1,]
-# opt_sol[d_var_idx$ep1[edges$from %in% c(1,9)],]
-# opt_sol[d_var_idx$ep1,] %>% filter(optimal_sols > 0)
+# opt_sol[d_var_idx$epsilon,]
+# opt_sol[d_var_idx$epsilon[edges$from %in% c(1,9)],]
+# opt_sol[d_var_idx$epsilon,] %>% filter(optimal_sols > 0)
 
 price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, price_dir_cost, import_cost) {
   
   obj_ <- integer(n_d_vars)
   obj_[d_var_idx$w] <- flow_cost
-  obj_[d_var_idx$ep1] <- price_dir_cost
-  # obj_[d_var_idx$x] <- price_dir_cost
+  obj_[d_var_idx$x] <- price_dir_cost
+  obj_[d_var_idx$epsilon] <- 1
   obj_[d_var_idx$t] <- import_cost
   
   model_result <- solve_gurobi(obj = obj_, A = A_, sense = sense_, vtype = vtype_, rhs = rhs_)
@@ -527,8 +508,9 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
                  optimal_solution = opt_sol)
   return(result)
 }
-price_dir_cost_ <- exp(price_pval_vec)
-price_dir_cost_ <- (1+price_pval_vec)^3
+
+# price_dir_cost_ <- (1-price_pval_vec)
+price_dir_cost_ <- (1-price_pval_vec_filtered)
 optimal_network_map1 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 1)
 optimal_network_map1$optimal_network_map
 ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 1 (", period[1], "-", period[length(period)], ").png"),
@@ -542,16 +524,37 @@ optimal_network_map10 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_
 ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 10 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map10$optimal_network_map, scale=1)
 
-## with price_complement
+## with w_complement
 ## price d_var
-n_E_var <- 3
+A_w_complement_create <- function(d_var_idx_) {
+  
+  rows <- c(rep(1:K, 2),
+            rep((K+1):(2*K), 2))
+  cols <- c(d_var_idx_$w[undir_edges$edges_idx], d_var_idx_$z,
+            d_var_idx_$w[undir_edges$edges_idx_rev], d_var_idx_$z)
+  vals <- c(rep(-1, K), rep(100, K),
+            rep(-1, K), rep(-100, K))
+  n_d_vars_ <- d_var_idx_[[length(d_var_idx_)]] %>% max
+  
+  result <- sparseMatrix(
+    i = rows,
+    j = cols,
+    x = vals,
+    dims = c(2*K, n_d_vars_)
+  )
+  
+  return(result)
+}
+b_w_complement <- c(rep(0, K), rep(-100, K))
+
+n_E_var <- 2
 d_var_idx <- list(
   w = 1:E,
-  ep1 = (E+1):(2*E),
-  x = (2*E+1):(3*E),
-  z = (3*E+1):(3*E+K),
-  s = (n_E_var*E+K+1):(n_E_var*E+K+N),
-  t = (n_E_var*E+K+N+1):(n_E_var*E+K+2*N)
+  x = (E+1):(2*E),
+  z = (2*E+1):(2*E+K),
+  epsilon = (n_E_var*E+K+1):(n_E_var*E+K+N),
+  s = (n_E_var*E+K+N+1):(n_E_var*E+K+2*N),
+  t = (n_E_var*E+K+2*N+1):(n_E_var*E+K+3*N)
 )
 
 d_vars <- create_d_vars(d_var_idx)
@@ -560,12 +563,12 @@ n_d_vars <- length(d_vars)
 A_source_limit <- A_source_limit_create(d_var_idx)
 A_consumption <- A_consumption_create(d_var_idx)
 A_seizure <- A_seizure_create(d_var_idx)
-A_price <- A_price_create(d_var_idx)
-A_price_complement <- A_price_complement_create(d_var_idx)
+A_flow_indicator <- A_flow_indicator_create(d_var_idx)
+A_w_complement <- A_w_complement_create(d_var_idx)
 A_source_indicator <- A_source_indicator_create(d_var_idx)
 
-A_ <- rbind(A_source_limit, A_consumption, A_seizure, A_price, A_price_complement, A_source_indicator)
-rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_price, b_price_complement, b_source_indicator)
+A_ <- rbind(A_source_limit, A_consumption, A_seizure, A_flow_indicator, A_w_complement, A_source_indicator)
+rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_flow_indicator, b_w_complement, b_source_indicator)
 sense_ <- c(rep("=", 1+N), rep(">", nrow(A_)-N-1))
 # sense_ <- c("=", rep(">", nrow(A_)-1))
 
@@ -638,7 +641,7 @@ A_seizure_in_and_out_create <- function(d_var_idx_) {
 }
 A_seizure_in_and_out <- A_seizure_in_and_out_create(d_var_idx)
 
-A_with_seizure_in_and_out <- rbind(A_source_limit, A_consumption, A_seizure_in_and_out, A_price, A_price_complement, A_source_indicator)
+A_with_seizure_in_and_out <- rbind(A_source_limit, A_consumption, A_seizure_in_and_out, A_price, A_w_complement, A_source_indicator)
 optimal_network_map2 <- price_only_optimal_network_map(A_with_seizure_in_and_out, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = exp(price_pval_vec), import_cost = 1)
 optimal_network_map2$optimal_network_map
 
@@ -680,8 +683,8 @@ b_source_limit_with_seizure_ratio_est <- 100 - sum(seizure_ratio_est)
 
 A_seizure_ratio_est <- A_seizure_ratio_est_create(d_var_idx)
 
-A_with_seizure_in_and_out <- rbind(A_source_limit, A_consumption, A_seizure_ratio_est, A_price, A_price_complement, A_source_indicator)
-rhs_with_seizure_in_and_out <- c(b_source_limit_with_seizure_ratio_est, b_consumption, b_seizure, b_price, b_price_complement, b_source_indicator)
+A_with_seizure_in_and_out <- rbind(A_source_limit, A_consumption, A_seizure_ratio_est, A_price, A_w_complement, A_source_indicator)
+rhs_with_seizure_in_and_out <- c(b_source_limit_with_seizure_ratio_est, b_consumption, b_seizure, b_price, b_w_complement, b_source_indicator)
 optimal_network_map3 <- price_only_optimal_network_map(A_with_seizure_in_and_out, rhs_with_seizure_in_and_out, sense_relaxed_consumption, vtype_, flow_cost = 1, price_dir_cost = exp(price_pval_vec), import_cost = 1)
 optimal_network_map3$optimal_network_map
 optimal_network_map3$optimal_solution
