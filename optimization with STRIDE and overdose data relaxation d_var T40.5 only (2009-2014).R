@@ -362,6 +362,7 @@ states_data %>% filter(state %in% c("California", "Texas", "Florida", "New York"
   }
 }
 
+###### use model with z far below!!!!
 ## price d_var without w_complement
 n_E_var <- 2
 d_var_idx <- list(
@@ -400,11 +401,11 @@ sense_ <- c(rep("=", 1+N), rep(">", nrow(A_)-N-1))
   # vtype_[d_var_idx$z] <- "B"
   vtype_[d_var_idx$t] <- "B"
   
-  # lb_ <- integer(n_d_vars)
-  # ub_ <- rep(Inf, n_d_vars)
-  # ub_[d_var_idx$epsilon] <- 1
-  # ub_[d_var_idx$x] <- 1
-  # ub_[d_var_idx$t] <- 1
+  lb_ <- integer(n_d_vars)
+  ub_ <- rep(Inf, n_d_vars)
+  ub_[d_var_idx$epsilon] <- 1
+  ub_[d_var_idx$x] <- 1
+  ub_[d_var_idx$t] <- 1
 }
 
 
@@ -440,15 +441,16 @@ price_dvar_model_b10_sol[d_var_idx$epsilon,]
 # opt_sol[d_var_idx$epsilon[edges$from %in% c(1,9)],]
 # opt_sol[d_var_idx$epsilon,] %>% filter(optimal_sols > 0)
 
-price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, price_dir_cost, import_cost) {
+price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, lb_, ub_, flow_cost, price_dir_cost, import_cost) {
+  # flow_cost = 1; price_dir_cost = price_dir_cost_; import_cost = 5
   
   obj_ <- integer(n_d_vars)
   obj_[d_var_idx$w] <- flow_cost
   obj_[d_var_idx$x] <- price_dir_cost
-  obj_[d_var_idx$epsilon] <- 1
+  obj_[d_var_idx$epsilon] <- -1
   obj_[d_var_idx$t] <- import_cost
   
-  model_result <- solve_gurobi(obj = obj_, A = A_, sense = sense_, vtype = vtype_, rhs = rhs_)
+  model_result <- solve_gurobi(obj = obj_, A = A_, sense = sense_, vtype = vtype_, rhs = rhs_, lb= lb_, ub=ub_)
   
   opt_sol <- tibble(deicision_vars=d_vars, optimal_sols=model_result$x)
   
@@ -462,7 +464,9 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
                                  mutate(centroid = st_centroid(geometry)),
                                states_data %>% select(state, med_death, states_index),
                                by="state") %>% 
+    left_join(data.frame(states_index = 1:N, epsilon = opt_sol[d_var_idx$epsilon,]$optimal_sols), by = "states_index") %>% 
     arrange(states_index)
+  
   
   opt_network_map_coords <- st_coordinates(opt_network_map$centroid)
   coords <- tibble(long_i = opt_network_map_coords[,1][c(edges$from, 1:N)],
@@ -473,12 +477,14 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
   opt_network <- bind_cols(opt_network, coords)
   result_flow_index <- 1:E
   result_source_index <- (E+1):nrow(opt_network)
-  non_zero_flows <- opt_network[result_flow_index,] %>% filter(optimal_sols > 0)
+  non_zero_flows <- opt_network[result_flow_index,]
+  non_zero_flows$price_cost <- price_dir_cost
+  non_zero_flows <- non_zero_flows %>% filter(optimal_sols > 0)
   non_zero_imports <- opt_network[result_source_index,] %>% filter(optimal_sols > 0)
   
   opt_network_map %>% ggplot() +
-    geom_sf(color="black",
-            fill="white") +
+    geom_sf(aes(fill = -epsilon),
+            color="black") +
     expand_limits(x=opt_network_map$long, y=opt_network_map$lat) +
     labs(x=NULL, y=NULL, title=NULL) +
     theme_bw() + 
@@ -488,12 +494,15 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
           panel.border = element_blank(),
           panel.grid.major = element_blank(),
           panel.grid.minor = element_blank()) +
+    scale_fill_continuous(palette = c("white", "grey40"),
+                          limits = c(-1, 0)) +
     geom_sf(data = opt_network_map$centroid, color = "black", size = 2) +
     geom_segment(data=non_zero_flows,
                  aes(x=long_i, 
                      y=lat_i, 
                      xend=long_j,
-                     yend=lat_j),
+                     yend=lat_j,
+                     color = price_cost),
                  linewidth = 0.2+2*non_zero_flows$optimal_sols/max_flow,
                  arrow=arrow(angle=10,
                              length=unit(0.5, "cm"),
@@ -502,7 +511,10 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
     geom_text(data=non_zero_imports,
               aes(x=long_i + 10000, y=lat_i -50000),
               label=non_zero_imports$optimal_sols %>% round(1),
-              color="red") -> optimal_network_map
+              color="black") +
+    scale_color_continuous(palette = c("#197C83", "#C00000"),
+                           limits = c(0, 1)) +
+    labs(x=NULL, y=NULL, title=NULL, fill="seizure\ncost", color="price\ncost") -> optimal_network_map
   
   result <- list(optimal_network_map = optimal_network_map,
                  optimal_solution = opt_sol)
@@ -510,17 +522,17 @@ price_only_optimal_network_map <- function(A_, rhs_, sense_, vtype_, flow_cost, 
 }
 
 # price_dir_cost_ <- (1-price_pval_vec)
-price_dir_cost_ <- (1-price_pval_vec_filtered)
-optimal_network_map1 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 1)
+# price_dir_cost_ <- (1-price_pval_vec_filtered)
+optimal_network_map1 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 1)
 optimal_network_map1$optimal_network_map
 ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 1 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map1$optimal_network_map, scale=1)
 
-optimal_network_map5 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 5)
+optimal_network_map5 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 5)
 ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 5 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map5$optimal_network_map, scale=1)
 
-optimal_network_map10 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 10)
+optimal_network_map10 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 10)
 ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 10 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map10$optimal_network_map, scale=1)
 
@@ -571,38 +583,52 @@ A_ <- rbind(A_source_limit, A_consumption, A_seizure, A_flow_indicator, A_w_comp
 rhs_ <- c(b_source_limit, b_consumption, b_seizure, b_flow_indicator, b_w_complement, b_source_indicator)
 sense_ <- c(rep("=", 1+N), rep(">", nrow(A_)-N-1))
 # sense_ <- c("=", rep(">", nrow(A_)-1))
-
+price_dir_cost_ <- 1 - price_pval_vec
 {
+  # price_pval_threshold <- 0.8
+  # price_violated_idx <- which(price_t_test_summary$mean_state <= price_t_test_summary$mean_bordering_state)
+  # price_pval_vec_filtered <- price_pval_vec
+  # price_pval_vec_filtered[price_violated_idx] <- 1
   obj_ <- integer(n_d_vars)
-  obj_[d_var_idx$w] <- 1/100
-  obj_[d_var_idx$ep1] <- exp(price_pval_vec)
-  # obj_[d_var_idx$ep1] <-  1/(1.01-price_pval_vec)
-  obj_[d_var_idx$t] <- 0.5
+  # obj_[d_var_idx$epsilon] <- (1-price_pval_vec)
+  # obj_[d_var_idx$x[price_violated_idx]] <-  (1-price_pval_vec)[price_violated_idx]
   
   vtype_ <- rep("C", n_d_vars)
   vtype_[d_var_idx$x] <- "B"
   vtype_[d_var_idx$z] <- "B"
   vtype_[d_var_idx$t] <- "B"
   
-  # lb_ <- integer(n_d_vars)
-  # ub_ <- rep(Inf, n_d_vars)
-  # ub_[d_var_idx$ep1] <- 1
-  # ub_[d_var_idx$x] <- 1
-  # ub_[d_var_idx$t] <- 1
+  lb_ <- integer(n_d_vars)
+  ub_ <- rep(Inf, n_d_vars)
+  ub_[d_var_idx$epsilon] <- 1
+  ub_[d_var_idx$x] <- 1
+  ub_[d_var_idx$z] <- 1
+  ub_[d_var_idx$t] <- 1
 }
 
-optimal_network_map1 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 1)
+optimal_network_map1 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 1)
 optimal_network_map1$optimal_network_map
-ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 1 cycle (", period[1], "-", period[length(period)], ").png"),
+ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 1 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map1$optimal_network_map, scale=1)
 
-optimal_network_map5 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 5)
-ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 5 cycle (", period[1], "-", period[length(period)], ").png"),
+optimal_network_map5 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 5)
+ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 5 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map5$optimal_network_map, scale=1)
 
-optimal_network_map10 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 10)
-ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 10 cycle (", period[1], "-", period[length(period)], ").png"),
+optimal_network_map5$optimal_solution$optimal_sols[d_var_idx$w] %>% sum
+optimal_network_map5$optimal_solution$optimal_sols[d_var_idx$t] %>% sum
+-(optimal_network_map5$optimal_solution$optimal_sols[d_var_idx$epsilon]) %>% sum
+(optimal_network_map5$optimal_solution$optimal_sols[d_var_idx$z]*price_dir_cost_) %>% sum
+
+
+optimal_network_map10 <- price_only_optimal_network_map(A_, rhs_, sense_, vtype_, lb = lb_, ub = ub_, flow_cost = 1, price_dir_cost = price_dir_cost_, import_cost = 10)
+ggsave(paste0("Cocaine Network Optimization/Results with relaxation parameters/optimal networks seizure=inflows import_cost = 10 (", period[1], "-", period[length(period)], ").png"),
        optimal_network_map10$optimal_network_map, scale=1)
+
+optimal_network_map10$optimal_solution$optimal_sols[d_var_idx$w] %>% sum
+optimal_network_map10$optimal_solution$optimal_sols[d_var_idx$t] %>% sum
+-(optimal_network_map10$optimal_solution$optimal_sols[d_var_idx$epsilon]) %>% sum
+(optimal_network_map10$optimal_solution$optimal_sols[d_var_idx$z]*price_dir_cost_) %>% sum
 
 A_seizure_in_and_out_create <- function(d_var_idx_) {
   rows <- c()

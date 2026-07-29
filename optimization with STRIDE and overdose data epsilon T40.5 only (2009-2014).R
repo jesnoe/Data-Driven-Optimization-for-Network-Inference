@@ -28,6 +28,8 @@ for (i in 1:length(neighbor_xlsx$State)) {
   if (state_i == "Virginia") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
 }
 neighbor$`District of Columbia` <- c("Maryland", "Virginia")
+neighbor$Michigan <- neighbor$Michigan[-3] # remove Minnesota from Michigan's neighbors
+neighbor$Minnesota <- neighbor$Minnesota[-2] # remove Michigan from Minnesota's neighbors
 
 # Cocaine Data
 cocaine <- stride %>%

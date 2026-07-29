@@ -31,6 +31,8 @@ for (i in 1:length(neighbor_xlsx$State)) {
   if (state_i == "Virginia") neighbor[[state_i]] <- c(neighbor[[state_i]], "District of Columbia")
 }
 neighbor$`District of Columbia` <- c("Maryland", "Virginia")
+neighbor$Michigan <- neighbor$Michigan[-3] # remove Minnesota from Michigan's neighbors
+neighbor$Minnesota <- neighbor$Minnesota[-2] # remove Michigan from Minnesota's neighbors
 
 # Cocaine Data
 cocaine <- stride %>%
@@ -77,6 +79,7 @@ years1 <- 2000:2003
 years2 <- 2004:2008
 years3 <- 2009:2014
 t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summary (2009-2014).csv")
+price_t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summary greater (2009-2014).csv") %>% as_tibble
 }
 
 find_state_index <- function(d_var) {
@@ -172,6 +175,7 @@ cocaine_prices <- cocaine %>%
   states_data <- states_data %>% 
     filter(!is.na(med_death))
   N <- nrow(states_data) # Total number of nodes
+  E <- t_test_summary
   states_data$states_index <- 1:N
   
   d_vars <- c()
@@ -184,6 +188,10 @@ cocaine_prices <- cocaine %>%
   d_vars <- c(d_vars, paste0("S", 1:N))
   d_vars <- c(d_vars, paste0("x", 1:N))
   n_d_vars <- length(d_vars)
+  
+  # edges <- tibble(from = price_t_test_summary$state_index, to = price_t_test_summary$bordering_state_index) %>% mutate(varnames = paste0("w_", from, ",", to))
+  # t_test_summary_both_dir <- t_test_summary %>% select()
+  
   PO <- 100 # overdose proportional parameter
   # PS <- 5 # seizure proportionality parameter
   epsilon <- 0.9
@@ -338,11 +346,33 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
     
     opt_sol_Si <- opt_sol %>% filter(grepl("S", decision_vars)) %>% rename(states_index = i)
     opt_sol_Si_sf <- left_join(overdose_map_year %>% filter(states_index %in% opt_sol_Si$states_index), opt_sol_Si %>% select(states_index, optimal_sols), by="states_index")
+    opt_sol <- opt_sol[result_flow_index,]
+    
+    if (nrow(opt_sol) > 0) {
+      p_val_vec <- c()
+      for (i in 1:nrow(opt_sol)) {
+        from_i <- opt_sol$i[i]
+        to_i <- opt_sol$j[i]
+        price_dir_i <- price[to_i] >= price[from_i]
+        
+        if (from_i > to_i) {
+          temp <- from_i
+          from_i <- to_i
+          to_i <- temp
+        }
+        
+        t_test_i <- t_test_summary %>% filter(state_index == from_i & bordering_state_index == to_i)
+        p_value_i <- ifelse(price_dir_i, 0, t_test_i$p_value)
+        p_val_vec <- c(p_val_vec, p_value_i)
+      }
+      p_val_vec[is.na(p_val_vec)] <- 0
+      opt_sol$p_value <- as.integer(p_val_vec >= alpha_t_test) %>% as.factor
+    }
     
     
     overdose_map_year %>% ggplot() +
       geom_sf(fill = "white",
-                  color="black") +
+              color="black") +
       # geom_polygon(aes(x=long,
       #                  y=lat,
       #                  group=group,
@@ -351,7 +381,6 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
       scale_fill_viridis_c(na.value="white") +
       expand_limits(x=overdose_map_year$long, y=overdose_map_year$lat) +
       # coord_quickmap() +
-      labs(x="", y="", fill="") +#title=bquote(paste(epsilon[s], "=", .(epsilon_si), ", ", alpha, "=", .(alpha_i), ", opt_val=", .(opt_val_i)) )) +
       theme_bw() + 
       theme(axis.ticks = element_blank(),
             axis.line =  element_blank(),
@@ -360,18 +389,21 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
             panel.grid.major = element_blank(),
             panel.grid.minor = element_blank()) +
       geom_sf(data = overdose_map_year$centroid, color = "black", size = 2) +
-      geom_segment(data=opt_sol[result_flow_index,],
+      geom_segment(data=opt_sol,
                    aes(x=long_i, 
                        y=lat_i, 
                        xend=long_j,
-                       yend=lat_j),
-                   color="black",
-                   linewidth = 0.2+2*opt_sol$optimal_sols[result_flow_index]/max_flow,
+                       yend=lat_j,
+                       color=p_value),
+                   linewidth = 0.2+2*opt_sol$optimal_sols/max_flow,
                    arrow=arrow(angle=10,
                                length=unit(0.3, "cm"),
                                type="closed")
       ) +
-      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "red", size =3) -> optimal_network_map
+      scale_color_manual(values = c("0" = "#197C83", "1" = "#C00000"),
+                         labels = c("0" = "no relax", "1" = "relaxed")) +
+      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "black", size =3) +
+      labs(x=NULL, y=NULL, fill=NULL, color=NULL) -> optimal_network_map
     ggsave(paste0("Cocaine Network Optimization/Results with Overdose deaths T40.5 only equal mean test 1999-2016/optimal networks equal mean test epsilton_s ",
                   period[1], "-", period[length(period)],
                   " (alpha=",
