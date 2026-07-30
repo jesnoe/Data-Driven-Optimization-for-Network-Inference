@@ -399,7 +399,7 @@ for (alpha_i in seq(1, 0, by=-.1)) {
       scale_fill_viridis_c(na.value="white") +
       expand_limits(x=overdose_map_year$long, y=overdose_map_year$lat) +
       # coord_quickmap() +
-      labs(x="", y="", fill="") +#title=bquote(paste(epsilon[s], "=", .(epsilon_si), ", ", alpha, "=", .(alpha_i), ", opt_val=", .(opt_val_i)) )) +
+      labs(x="", y="") +#title=bquote(paste(epsilon[s], "=", .(epsilon_si), ", ", alpha, "=", .(alpha_i), ", opt_val=", .(opt_val_i)) )) +
       theme_bw() + 
       theme(axis.ticks = element_blank(),
             axis.line =  element_blank(),
@@ -419,7 +419,7 @@ for (alpha_i in seq(1, 0, by=-.1)) {
                                length=unit(0.3, "cm"),
                                type="closed")
       ) +
-      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "red", size =3) -> optimal_network_map
+      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "red", size =3, hjust = 0.5, vjust = 1.5) -> optimal_network_map
     ggsave(paste0("Cocaine Network Optimization/Results with Overdose deaths T40.5 only 1999-2016/optimal networks epsilton_s ",
                   period[1], "-", period[length(period)],
                   " (alpha=",

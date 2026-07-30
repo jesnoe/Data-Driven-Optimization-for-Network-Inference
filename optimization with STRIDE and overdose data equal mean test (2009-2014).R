@@ -402,7 +402,7 @@ for (alpha_i in seq(1, 0, by=-0.1)) {
       ) +
       scale_color_manual(values = c("0" = "#197C83", "1" = "#C00000"),
                          labels = c("0" = "no relax", "1" = "relaxed")) +
-      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "black", size =3) +
+      geom_sf_text(data = opt_sol_Si_sf, aes(label=round(optimal_sols, 1)), color = "black", size =3, hjust = 0.5, vjust = 1.5) +
       labs(x=NULL, y=NULL, fill=NULL, color=NULL) -> optimal_network_map
     ggsave(paste0("Cocaine Network Optimization/Results with Overdose deaths T40.5 only equal mean test 1999-2016/optimal networks equal mean test epsilton_s ",
                   period[1], "-", period[length(period)],
