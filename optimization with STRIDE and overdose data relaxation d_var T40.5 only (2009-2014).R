@@ -1,5 +1,6 @@
-# setwd("/Users/R")
 # setwd("C:/Users/User/Documents/R")
+# Sys.setenv(LANG = "en_US.UTF-8")
+# Sys.setenv(GRB_LICENSE_FILE = "C:/gurobi1203/win64/licenses/gurobi.lic")
 library(readxl)
 library(gurobi)
 library(stringi)
@@ -131,7 +132,7 @@ states_data <- full_join(price_period, seizure_period, by="state") %>%
 
 states_data$med_death <- ifelse(is.na(states_data$med_death), 0, states_data$med_death)  
 states_data$max_weight <- ifelse(is.na(states_data$max_weight), 0, states_data$max_weight)
-
+# write.csv(states_data, "Cocaine Network Optimization/states_data.csv", row.names = F)
 
 # importing states based on NDTA 2011: CA, TX, FL, NY
 states_data %>% filter(state %in% c("California", "Texas", "Florida", "New York")) # 4, 9, 31, 42

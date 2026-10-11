@@ -18,8 +18,6 @@ library(lubridate)
   # }
   stride$State <- ifelse(stride$State == "NB", "NE", stride$State)
   
-  price_t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summary (2009-2014).csv") %>% as_tibble
-  
   neighbor_xlsx <- read_xlsx("Cocaine Network Optimization/states neighborhood.xlsx")
   neighbor <- list()
   for (i in 1:length(neighbor_xlsx$State)) {
@@ -54,24 +52,6 @@ library(lubridate)
     rename(state=state_name) %>% 
     relocate(state)
   
-  overdose <- read_xlsx("Cocaine Network Optimization/Overdose deaths T40.5 only 1999-2020.xlsx")
-  VSRR <- read.csv("Cocaine Network Optimization/VSRR_Provisional_Drug_Overdose_Death_Counts (2015-2023).csv") %>%
-    as_tibble %>% 
-    mutate(state=State,
-           Data.Value=as.numeric(Data.Value)) %>% 
-    left_join(states %>% 
-                rename(state=state_abbv) %>% 
-                select(state, state_name) %>% 
-                unique,
-              by="state") %>% 
-    select(-State, -state) %>% 
-    rename(state=state_name) %>% 
-    relocate(state)
-  VSRR_cocaine <- VSRR %>% 
-    filter(Indicator == "Cocaine (T40.5)") %>% 
-    group_by(state, Year) %>% 
-    summarize(overdose_death=sum(Data.Value, na.rm=T))
-  
   years1 <- 2000:2003
   years2 <- 2004:2008
   years3 <- 2009:2014
@@ -85,7 +65,6 @@ library(lubridate)
   
   cocaine_period <- cocaine %>% 
     filter(!is.na(state) & Seize.Year %in% c(years2, years3) & adjusted_price > 0 & Nt.Wt >= 5 & Nt.Wt <= 1000)
-  # cocaine_period %>% group_by(state) %>% summarize(n_pu=n()) %>% view
   cocaine_period %>% filter(state %in% c("Vermont", "South Dakota", "Oregon"))
 }
 
