@@ -1,3 +1,4 @@
+# setwd("C:/Users/User/Documents/R")
 library(readxl)
 library(gurobi)
 library(stringi)
@@ -57,6 +58,7 @@ price_t_test_summary <- read.csv("Cocaine Network Optimization/price t_test_summ
                                  j = price_t_test_summary$bordering_state_index,
                                  x = price_t_test_summary$p_value,
                                  dims = c(N, N))
+  price_pval_vec <- price_t_test_summary$p_value
   
   # all possible edges (directed) of U.S. state-level network
   edges <- tibble(from = price_t_test_summary$state_index, to = price_t_test_summary$bordering_state_index) %>% mutate(varnames = paste0("w_", from, ",", to))
